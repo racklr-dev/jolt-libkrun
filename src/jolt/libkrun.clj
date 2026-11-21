@@ -39,7 +39,7 @@
             (check! "krun_set_port_map" (set-port-map ctx pm))))
         (when exec
           (ffi/with-c-string [exe (first exec)]
-            (ffi/with-c-string-array [argv (inc (count exec))] (conj (vec exec) nil)
+            (ffi/with-c-string-array [argv (count exec)] (conj (vec (rest exec)) nil)
               (ffi/with-c-string-array [env 4] ["PATH=/usr/bin:/bin" "HOME=/root" "HOSTNAME=microvm" nil]
                 (check! "krun_set_exec" (set-exec ctx exe argv env))))))
         (check! "krun_start_enter" (start-enter ctx))))))
