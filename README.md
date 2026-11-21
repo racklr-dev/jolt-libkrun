@@ -21,4 +21,5 @@ libkrun microVM bindings for [Jolt](https://github.com/jolt-lang/jolt): the
 
 - `boot!` skips the Linux `RLIMIT_NOFILE` cap the runner applies; virtio-fs with
   many fds may need it (shortcut: add `set-rlimits` callers later).
-- Untested against real libkrun here; ABI types taken from libkrun's `krun.h`.
+- Smoke-tested on Debian 13 x86_64 with libkrun 1.19.6: `create-ctx` and
+  `set-vm-config` return 0 (see `test/jolt/libkrun_smoke_test.clj`).
