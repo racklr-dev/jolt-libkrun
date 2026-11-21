@@ -1,0 +1,4 @@
+{:paths ["src"]
+ :jolt/native [{:name "krun"
+                :linux  ["libkrun.so"]
+                :darwin ["libkrun.dylib"]}]}
