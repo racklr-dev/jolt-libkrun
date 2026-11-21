@@ -20,8 +20,8 @@
 (defn boot!
   "Create a microVM context, apply opts, and block in the guest until it exits.
   opts: :rootfs (required), :workdir, :cpus, :memory-mib, :port-map \"HOST:22\",
-  :virtiofs [tag path], :exec [cmd arg...]."
-  [{:keys [rootfs workdir cpus memory-mib port-map virtiofs exec]}]
+  :virtiofs [tag path], :exec [cmd arg...], :rlimits [str...]."
+  [{:keys [rootfs workdir cpus memory-mib port-map virtiofs exec rlimits]}]
   (let [ctx (create-ctx)]
     (when (neg? ctx) (throw (ex-info "krun_create_ctx failed" {:rc ctx})))
     (check! "krun_set_vm_config" (set-vm-config ctx (or cpus 2) (or memory-mib 512)))
@@ -34,6 +34,9 @@
             (ffi/with-c-string [t tag]
               (ffi/with-c-string [p path]
                 (check! "krun_add_virtiofs" (add-virtiofs ctx t p))))))
+        (when rlimits
+          (ffi/with-c-string-array [rl (inc (count rlimits))] (conj (vec rlimits) nil)
+            (check! "krun_set_rlimits" (set-rlimits ctx rl))))
         (when port-map
           (ffi/with-c-string-array [pm 2] [port-map nil]
             (check! "krun_set_port_map" (set-port-map ctx pm))))
