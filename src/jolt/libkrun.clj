@@ -17,10 +17,23 @@
 (defn- check! [what rc]
   (when-not (zero? rc) (throw (ex-info what {:rc rc}))))
 
+(defn- add-virtiofs!
+  "Add one or more virtio-fs devices. Accepts a single [tag path] pair or a
+  vector of pairs [[tag path] ...]."
+  [ctx virtiofs]
+  (let [pairs (if (and (sequential? virtiofs) (= 2 (count virtiofs))
+                       (string? (first virtiofs)))
+                [virtiofs]
+                virtiofs)]
+    (doseq [[tag path] pairs]
+      (ffi/with-c-string [t tag]
+        (ffi/with-c-string [p path]
+          (check! "krun_add_virtiofs" (add-virtiofs ctx t p)))))))
+
 (defn boot!
   "Create a microVM context, apply opts, and block in the guest until it exits.
   opts: :rootfs (required), :workdir, :cpus, :memory-mib, :port-map \"HOST:22\",
-  :virtiofs [tag path], :exec [cmd arg...], :rlimits [str...]."
+  :virtiofs [tag path] or [[tag path] ...], :exec [cmd arg...], :rlimits [str...]."
   [{:keys [rootfs workdir cpus memory-mib port-map virtiofs exec rlimits]}]
   (let [ctx (create-ctx)]
     (when (neg? ctx) (throw (ex-info "krun_create_ctx failed" {:rc ctx})))
@@ -29,11 +42,7 @@
       (check! "krun_set_root" (set-root ctx root))
       (ffi/with-c-string [wd (or workdir "/")]
         (check! "krun_set_workdir" (set-workdir ctx wd))
-        (when virtiofs
-          (let [[tag path] virtiofs]
-            (ffi/with-c-string [t tag]
-              (ffi/with-c-string [p path]
-                (check! "krun_add_virtiofs" (add-virtiofs ctx t p))))))
+        (when virtiofs (add-virtiofs! ctx virtiofs))
         (when rlimits
           (ffi/with-c-string-array [rl (inc (count rlimits))] (conj (vec rlimits) nil)
             (check! "krun_set_rlimits" (set-rlimits ctx rl))))
