@@ -59,6 +59,7 @@
 (defkrun vmm-run                "krun_vmm_run"                [:pointer] :void :blocking)
 (defkrun result-name-cstr       "krun_result_name_cstr"       [:uint64] :string)
 (defkrun error-code             "krun_error_code"             [:pointer] :uint32)
+(defkrun vmm-builder-serial-console "krun_vmm_builder_add_serial_console" [:pointer :int :int :pointer] :uint64)
 
 (defn- check-result! [what r]
   (when-not (zero? r)
@@ -104,6 +105,8 @@
         mgr (mmio-device-manager-new)
         _ (doseq [d (concat [root-dev] mount-devs net-devs)] (device-manager-add mgr d))
         _ (vmm-builder-devices slot mgr)
+        _ (check-result! "krun_vmm_builder_add_serial_console"
+                          (vmm-builder-serial-console slot 0 1 err))
         vmm (vmm-builder-build slot err)
         _ (when (ffi/null? vmm)
             (let [eh (ffi/read err :pointer)]
