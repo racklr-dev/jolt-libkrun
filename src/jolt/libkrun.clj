@@ -60,6 +60,9 @@
 (defkrun result-name-cstr       "krun_result_name_cstr"       [:uint64] :string)
 (defkrun error-code             "krun_error_code"             [:pointer] :uint32)
 (defkrun vmm-builder-serial-console "krun_vmm_builder_add_serial_console" [:pointer :int :int :pointer] :uint64)
+(defkrun console-device-builder "krun_console_device_builder" [] :pointer)
+(defkrun console-builder-add-default "krun_console_builder_add_default_console" [:pointer :int :int :int :pointer] :uint64)
+(defkrun console-builder-build "krun_console_builder_build" [:pointer :pointer] :pointer)
 
 (defn- check-result! [what r]
   (when-not (zero? r)
@@ -103,7 +106,11 @@
                                   (net-device-tap (kstr! id) (kstr! tap)
                                                   (kbytes! (or mac (byte-array 6))) 0 err)))
         mgr (mmio-device-manager-new)
-        _ (doseq [d (concat [root-dev] mount-devs net-devs)] (device-manager-add mgr d))
+        console-builder (console-device-builder)
+        _ (check-result! "krun_console_builder_add_default_console"
+                          (console-builder-add-default console-builder 0 1 2 err))
+        console-dev (ptr-or-throw! "krun_console_builder_build" (console-builder-build console-builder err))
+        _ (doseq [d (concat [root-dev] mount-devs net-devs [console-dev])] (device-manager-add mgr d))
         _ (vmm-builder-devices slot mgr)
         _ (check-result! "krun_vmm_builder_add_serial_console"
                           (vmm-builder-serial-console slot 0 1 err))
