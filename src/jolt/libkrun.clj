@@ -82,10 +82,11 @@
 (defn- read-bytes [path]
   (java.nio.file.Files/readAllBytes (java.nio.file.Paths/get path (into-array String []))))
 
-(defn- config-json [exec env cwd]
+(defn- config-json [exec env cwd dhcp]
   (json/write-str {"process" {"args" (vec exec)
                               "env" (vec (or env []))
-                              "cwd" (or cwd "/")}}))
+                              "cwd" (or cwd "/")}
+                   "dhcp" (boolean dhcp)}))
 
 (defn boot!
   "Boot a microVM with the libkrun 2.0 API and block until the guest exits
@@ -102,7 +103,7 @@
     :cpus :memory-mib
     :mounts        [[tag host-path] ...] extra virtio-fs devices
     :net-taps      [{:id :tap :mac}] virtio-net devices (TAP backend)"
-  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary]}]
+  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary dhcp]}]
   (let [err (ffi/alloc 8)
         _ (init-log 2 4 0 0 err)  ; stderr, Debug — guest console logs here
         slot (ffi/alloc 8)
@@ -121,7 +122,7 @@
                          (fs-overlay-add-file overlay (kstr! "/init.krun")
                                                (kbytes! (read-bytes init-bin)) 0755 true err))
         _ (when (seq exec)
-            (let [cfg (.getBytes (config-json exec env cwd) "UTF-8")]
+            (let [cfg (.getBytes (config-json exec env cwd dhcp) "UTF-8")]
               (check-result! "krun_fs_overlay_add_file(/.krun_config.json)"
                              (fs-overlay-add-file overlay (kstr! "/.krun_config.json")
                                                    (kbytes! cfg) 0644 true err))))
