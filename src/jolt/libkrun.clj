@@ -86,7 +86,8 @@
   (json/write-str {"process" {"args" (vec exec)
                               "env" (vec (or env []))
                               "cwd" (or cwd "/")}
-                   "dhcp" (boolean dhcp)}))
+                   "dhcp" (boolean dhcp)
+                   "dhcp_renew" (boolean dhcp)}))
 
 (defn boot!
   "Boot a microVM with the libkrun 2.0 API and block until the guest exits
