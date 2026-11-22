@@ -3,7 +3,7 @@
 [![tests](https://github.com/racklr-dev/jolt-libkrun/actions/workflows/ci.yml/badge.svg)](https://github.com/racklr-dev/jolt-libkrun/actions/workflows/ci.yml)
 
 [libkrun](https://github.com/containers/libkrun) 2.0 bindings for
-[jolt](https://github.com/jolt-lang/jolt) — the **new** builder/device C API
+[jolt](https://github.com/jolt-lang/jolt): the **new** builder/device C API
 (`krun_vmm_builder_*`, `krun_payload_*`, `krun_*_device_*`).
 
 The old `krun_create_ctx`/`krun_set_*` API is removed on libkrun `main`, so this
@@ -32,7 +32,7 @@ library tracks libkrun's version (this is **2.0.0**, matching libkrun 2.0.0).
 ```
 
 The shared library is declared `:optional`, so an app can load this namespace
-without libkrun installed — [jolt.libkrun.probe](#modules) answers whether it
+without libkrun installed. [jolt.libkrun.probe](#modules) answers whether it
 is there, and `boot!` fails at its first foreign call if it is not.
 
 ## Build libkrun 2.0 from main
@@ -46,7 +46,7 @@ libkrun 2.0 reuses the installed `libkrunfw.so.5` (it only needs
 `krunfw_get_kernel`), so no libkrunfw kernel build is required. Run jolt with
 `LD_LIBRARY_PATH=<libkrun>/target/release` to load the 2.0 library.
 
-## The new API shape
+## The new API
 
 ```
 vmm_builder_new -> vcpus/ram_mib -> payload_load_krunfw -> [append_cmdline]
@@ -64,8 +64,8 @@ vmm_builder_new -> vcpus/ram_mib -> payload_load_krunfw -> [append_cmdline]
 
 ## Modules
 
-- `jolt.libkrun` — the 2.0 bindings + `boot!`.
-- `jolt.libkrun.probe` — `find-libkrun`/`find-libkrunfw`/`kvm-available?`.
+- `jolt.libkrun`: the 2.0 bindings + `boot!`.
+- `jolt.libkrun.probe`: `find-libkrun`/`find-libkrunfw`/`kvm-available?`.
 
 ## Smoke test
 
