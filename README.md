@@ -1,23 +1,21 @@
 # jolt-libkrun
 
-libkrun 2.0 bindings for [jolt](https://github.com/jolt-lang/jolt) — the **new**
-builder/device C API (`krun_vmm_builder_*`, `krun_payload_*`, `krun_*_device_*`).
+[![tests](https://github.com/racklr-dev/jolt-libkrun/actions/workflows/ci.yml/badge.svg)](https://github.com/racklr-dev/jolt-libkrun/actions/workflows/ci.yml)
+
+[libkrun](https://github.com/containers/libkrun) 2.0 bindings for
+[jolt](https://github.com/jolt-lang/jolt) — the **new** builder/device C API
+(`krun_vmm_builder_*`, `krun_payload_*`, `krun_*_device_*`).
 
 The old `krun_create_ctx`/`krun_set_*` API is removed on libkrun `main`, so this
 library tracks libkrun's version (this is **2.0.0**, matching libkrun 2.0.0).
 
-## Build libkrun 2.0 from main
+## Quickstart
 
-```bash
-rustup target add x86_64-unknown-linux-musl
-cd libkrun && make NET=1   # -> target/release/libkrun.so.2.0.0
+```clojure
+{:deps {racklr-dev/jolt-libkrun
+        {:git/url "https://github.com/racklr-dev/jolt-libkrun"
+         :git/sha "<latest sha>"}}}
 ```
-
-libkrun 2.0 reuses the installed `libkrunfw.so.5` (it only needs
-`krunfw_get_kernel`), so no libkrunfw kernel build is required. Run jolt with
-`LD_LIBRARY_PATH=<libkrun>/target/release` to load the 2.0 library.
-
-## Use
 
 ```clojure
 (require '[jolt.libkrun :as krun])
@@ -30,8 +28,23 @@ libkrun 2.0 reuses the installed `libkrunfw.so.5` (it only needs
 ;; mounts + networking
 (krun/boot! {:rootfs "/path/to/rootfs"
              :mounts [["workspace" "/host/ws"]]
-             :net-taps [{:id "eth0" :tap "jolt0" :mac (byte-array [2 0 0 0 0 1])}]})
+             :net-taps [{:id "eth0" :tap "jolt0" :mac (byte-array [2 0 0 0 1])}]})
 ```
+
+The shared library is declared `:optional`, so an app can load this namespace
+without libkrun installed — [jolt.libkrun.probe](#modules) answers whether it
+is there, and `boot!` fails at its first foreign call if it is not.
+
+## Build libkrun 2.0 from main
+
+```bash
+rustup target add x86_64-unknown-linux-musl
+cd libkrun && make NET=1   # -> target/release/libkrun.so.2.0.0
+```
+
+libkrun 2.0 reuses the installed `libkrunfw.so.5` (it only needs
+`krunfw_get_kernel`), so no libkrunfw kernel build is required. Run jolt with
+`LD_LIBRARY_PATH=<libkrun>/target/release` to load the 2.0 library.
 
 ## The new API shape
 
@@ -57,6 +70,8 @@ vmm_builder_new -> vcpus/ram_mib -> payload_load_krunfw -> [append_cmdline]
 ## Smoke test
 
 ```bash
+jolt test   # loads the FFI surface; skips where libkrun is absent
+
 LD_LIBRARY_PATH=/path/to/libkrun/target/release \
   jolt run test/boot2_test.clj   # boots alpine + /bin/sh, exits 0
 ```

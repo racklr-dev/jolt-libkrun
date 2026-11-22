@@ -5,10 +5,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install jolt
-        run: curl -sL https://raw.githubusercontent.com/jolt-lang/jolt/main/install | bash
-      - name: Test
+      - name: Install jolt (pinned)
+        run: curl -sL https://raw.githubusercontent.com/jolt-lang/jolt/main/install | bash -s -- --version 0.8.28
+      - name: Probe smoke (loads the FFI surface; skips where libkrun is absent)
         run: |
           export PATH="$HOME/.local/bin:$PATH"
-          jolt run test/jolt/libkrun_smoke_test.clj
-          jolt run test/jolt/libkrun_probe_test.clj
+          jolt test
+      # Boot tests need /dev/kvm + a libkrun 2.0 build; run on a self-hosted
+      # runner with KVM:
+      #   LD_LIBRARY_PATH=/path/to/libkrun/target/release jolt run test/boot2_test.clj
+      #   LD_LIBRARY_PATH=/path/to/libkrun/target/release jolt run test/nettap_test.clj

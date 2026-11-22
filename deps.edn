@@ -1,4 +1,22 @@
-{:paths ["src"]
- :jolt/native [{:name "krun"
-                :linux  ["libkrun.so"]
-                :darwin ["libkrun.dylib"]}]}
+{;; jolt.libkrun binds libkrun 2.0's builder/device C API through jolt.ffi
+ ;; by-value struct arguments, which arrived after jolt 0.8.0's ffi/write
+ ;; argument order. Declare the floor so an older runtime refuses rather than
+ ;; writing to the wrong place or miscompiling the structs.
+ :jolt/min-version "0.8.28"
+
+ :paths ["src"]
+
+ ;; libkrun is dlopen'd RTLD_LOCAL before jolt.libkrun's foreign-fn bindings
+ ;; load. :optional, because jolt loads every dependency's natives at startup
+ ;; whether or not anything requires the namespace that uses them; required,
+ ;; it made any app with this library in its tree refuse to start on a host
+ ;; without libkrun — even jolt-microvm's pre-flight check!, which exists to
+ ;; report that libkrun is missing. The probe (jolt.libkrun.probe) is the
+ ;; availability gate; boot! fails at its first foreign call when libkrun is
+ ;; absent. Candidates are versioned soname-first (libkrun 2.0 installs
+ ;; libkrun.so.2), then the unversioned name a dev build keeps in its tree.
+ :jolt/native [{:name "krun" :optional true
+                :linux  ["libkrun.so.2" "libkrun.so"]
+                :darwin ["libkrun.dylib"]}]
+
+ :tasks {test "jolt run test/jolt/libkrun_probe_test.clj"}}
