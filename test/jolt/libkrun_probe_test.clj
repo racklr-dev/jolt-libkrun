@@ -56,13 +56,15 @@
 ;; libkrunfw.5.dylib, not the unversioned libkrunfw.dylib symlink. The
 ;; versioned leaf must win, and an unversioned-only dir must answer nil, never
 ;; a false present.
-(let [d (str (System/getProperty "java.io.tmpdir") "/jolt-probe-" (System/nanoTime))
-      mk (fn [n] (.mkdirs (java.io.File. d)) (spit (str d "/" n) ""))]
+(let [d (.getAbsolutePath (java.io.File. (System/getProperty "java.io.tmpdir")
+                                          (str "jolt-probe-" (System/nanoTime))))
+      p (fn [n] (.getAbsolutePath (java.io.File. d n)))
+      mk (fn [n] (.mkdirs (java.io.File. d)) (spit (p n) ""))]
   (mk "libkrunfw.3.dylib")
   (mk "libkrunfw.5.dylib")
   (mk "libkrunfw.dylib")   ; the link-time symlink the loader never consults
   (check "macOS libkrunfw picks the highest ABI version"
-         (str d "/libkrunfw.5.dylib")
+         (p "libkrunfw.5.dylib")
          (probe/find-libkrunfw-in :macos [d]))
   ;; remove the versioned files; the unversioned symlink alone must NOT pass
   (.delete (java.io.File. d "libkrunfw.3.dylib"))
@@ -72,11 +74,13 @@
          (probe/find-libkrunfw-in :macos [d])))
 
 ;; Linux versioned rule still works through the same seam.
-(let [d (str (System/getProperty "java.io.tmpdir") "/jolt-probe-" (System/nanoTime))
-      mk (fn [n] (.mkdirs (java.io.File. d)) (spit (str d "/" n) ""))]
+(let [d (.getAbsolutePath (java.io.File. (System/getProperty "java.io.tmpdir")
+                                          (str "jolt-probe-" (System/nanoTime))))
+      p (fn [n] (.getAbsolutePath (java.io.File. d n)))
+      mk (fn [n] (.mkdirs (java.io.File. d)) (spit (p n) ""))]
   (mk "libkrunfw.so.1.19.6")
   (check "linux libkrunfw parses a multi-dot versioned .so"
-         (str d "/libkrunfw.so.1.19.6")
+         (p "libkrunfw.so.1.19.6")
          (probe/find-libkrunfw-in :linux [d])))
 
 (println "ALL PROBE TESTS PASSED")
