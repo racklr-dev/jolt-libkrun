@@ -56,12 +56,15 @@ build is required. Run jolt with `LD_LIBRARY_PATH=<libkrun>/target/release`.
 | Function | Args | Returns | Errors |
 |---|---|---|---|
 | `boot!` | `opts` | the guest's exit (vmm_run exits this process) | fails at the first foreign call when libkrun is absent |
-| `libkrun-leaf` | — | resolved libkrun library path, or nil | — |
-| `libkrunfw-leaf` | — | resolved libkrunfw library path, or nil | — |
+| `host-os` | — | `:macos`, `:windows`, or `:linux` | — |
+| `libkrun-leaf` | `os` | leaf filename (`libkrun.so` / `libkrun.dylib`) | — |
+| `libkrunfw-link-leaf` | `os` | unversioned link leaf (`libkrunfw.so` / `libkrunfw.dylib`) | — |
 | `find-libkrun` | — | resolved libkrun library path, or nil | — |
-| `find-libkrunfw` | — | resolved libkrunfw library path, or nil | — |
-| `kvm-available?` | — | boolean | — |
-| `kvm-present?` | — | boolean (device exists, regardless of permission) | — |
+| `find-libkrunfw` | `os` | resolved libkrunfw runtime path, or nil (versioned `libkrunfw.N.dylib` on macOS) | — |
+| `find-libkrunfw-in` | `os dirs` | same search restricted to `dirs` (test seam) | — |
+| `hypervisor-available?` | `os` | macOS Hypervisor.framework usable (`kern.hv_support` = 1) | — |
+| `kvm-available?` | `os` | Linux: `/dev/kvm` read+write | — |
+| `kvm-present?` | `os` | Linux: `/dev/kvm` exists, regardless of permission | — |
 
 `boot!` `opts`: `:rootfs`, `:cpus`, `:memory-mib`, `:exec`, `:env`, `:cwd`,
 `:mounts`, `:net-taps`. Rootfs and mounts are virtio-fs devices (root is tag
