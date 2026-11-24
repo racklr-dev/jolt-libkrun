@@ -23,24 +23,21 @@
 (assert (ifn? krun/boot!) "jolt.libkrun must define boot!")
 (println :ffi-surface-loaded true)
 
-(let [os (probe/host-os)
-      lk (probe/find-libkrun)
+(let [lk (probe/find-libkrun)
       lkfw (probe/find-libkrunfw)]
-  (when-not lk
-    (println (str "skip: libkrun not found (CI runner, os " (name os) ")"))
-    (System/exit 0))
-  (assert (.startsWith lk "/") "find-libkrun must be absolute")
-  (assert (.startsWith lkfw "/") "find-libkrunfw must be absolute")
-  ;; the hardware backend assertion is OS-specific: /dev/kvm only on Linux,
-  ;; Hypervisor.framework only on macOS.
-  (case os
-    :linux (assert (probe/kvm-present?) "expected /dev/kvm on a libkrun host")
-    :macos (println :hypervisor-ok (probe/hypervisor-available?))
-    nil)
-  (println :libkrun lk :libkrunfw lkfw
-           :kvm-ok (probe/kvm-available?)
-           :hypervisor-ok (probe/hypervisor-available?))
-  (println "libkrun probe: libs found + backend checked OK"))
+  (if-not lk
+    (println (str "skip host probe: libkrun not found (CI runner, os " (name (probe/host-os)) ")"))
+    (do
+      (assert (.startsWith lk "/") "find-libkrun must be absolute")
+      (assert (.startsWith lkfw "/") "find-libkrunfw must be absolute")
+      ;; the hardware backend assertion is OS-specific: /dev/kvm only on Linux,
+      ;; Hypervisor.framework only on macOS.
+      (when (= (probe/host-os) :linux)
+        (assert (probe/kvm-present?) "expected /dev/kvm on a libkrun host"))
+      (println :libkrun lk :libkrunfw lkfw
+               :kvm-ok (probe/kvm-available?)
+               :hypervisor-ok (probe/hypervisor-available?))
+      (println "libkrun probe: libs found + backend checked OK"))))
 
 ;; -- pure tests: the macOS rules a Linux runner must still pin -------------
 (check "host-os returns a keyword" true (keyword? (probe/host-os)))
