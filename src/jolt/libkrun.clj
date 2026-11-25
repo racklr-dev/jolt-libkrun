@@ -69,6 +69,13 @@
 (defkrun fs-overlay-add-file    "krun_fs_overlay_add_file"    [:pointer :kstr :kbytes :uint32 :bool :pointer] :uint64)
 (defkrun fs-device-set-overlay  "krun_fs_device_set_overlay"  [:pointer :pointer] :void)
 
+;; virtio-net feature bits the guest needs to bring up eth0 reliably
+;; (CSUM | GUEST_CSUM | GUEST_TSO4 | GUEST_UFO | HOST_TSO4 | HOST_UFO),
+;; matching libkrun's own test_net COMPAT_NET_FEATURES. Passing 0 left the
+;; device without these and made the guest's virtio-net driver flaky, so a
+;; boot would sometimes never emit a DHCPDISCOVER.
+(def ^:private compat-net-features 19587)
+
 (defn- check-result! [what r]
   (when-not (zero? r)
     (throw (ex-info (str what " failed") {:rc r :result (result-name-cstr r)})))
@@ -134,7 +141,7 @@
         net-devs (for [{:keys [id tap mac]} net-taps]
                    (ptr-or-throw! (str "krun_net_device_new_tap(" tap ")")
                                   (net-device-tap (kstr! id) (kstr! tap)
-                                                  (kbytes! (or mac (byte-array 6))) 0 err)))
+                                                  (kbytes! (or mac (byte-array 6))) compat-net-features err)))
         mgr (mmio-device-manager-new)
         console-builder (console-device-builder)
         _ (check-result! "krun_console_builder_add_default_console"
