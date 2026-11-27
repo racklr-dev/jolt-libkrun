@@ -11,6 +11,7 @@
 (ns jolt.libkrun
   (:require [jolt.ffi :as ffi]
             [jolt.libkrun.display :as display]
+            [jolt.libkrun.input :as input]
             [clojure.string :as str]
             [clojure.data.json :as json]))
 
@@ -114,8 +115,10 @@
     :net-taps      [{:id :tap :mac}] virtio-net devices (TAP backend)
     :display       {:width :height :sink (fn [frame])} attach a virtio-gpu
                    device (see jolt.libkrun.display/gpu-device for the full
-                   opt map; :virgl-flags and :refresh-rate accepted too)"
-  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary dhcp display]}]
+                   opt map; :virgl-flags and :refresh-rate accepted too)
+    :keyboard      true — attach a virtio-input keyboard (see
+                   jolt.libkrun.input/keyboard-device; feed it send-key!)"
+  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary dhcp display keyboard?]}]
   (let [err (ffi/alloc 8)
         _ (init-log 2 4 0 0 err)  ; stderr, Debug — guest console logs here
         slot (ffi/alloc 8)
@@ -152,7 +155,8 @@
                           (console-builder-add-default console-builder 0 1 2 err))
         console-dev (ptr-or-throw! "krun_console_builder_build" (console-builder-build console-builder err))
         gpu-dev (when display (display/gpu-device display))
-        _ (doseq [d (concat [root-dev] mount-devs net-devs (when display [gpu-dev]) [console-dev])] (device-manager-add mgr d))
+        keyboard-dev (when keyboard? (input/keyboard-device))
+        _ (doseq [d (concat [root-dev] mount-devs net-devs (when display [gpu-dev]) (when keyboard? [keyboard-dev]) [console-dev])] (device-manager-add mgr d))
         _ (vmm-builder-devices slot mgr)
         vmm (vmm-builder-build slot err)
         _ (when (ffi/null? vmm)
