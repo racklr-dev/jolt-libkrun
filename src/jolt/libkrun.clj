@@ -10,6 +10,7 @@
 ;; is a caller-owned pointer to the struct bytes.
 (ns jolt.libkrun
   (:require [jolt.ffi :as ffi]
+            [jolt.libkrun.display :as display]
             [clojure.string :as str]
             [clojure.data.json :as json]))
 
@@ -110,8 +111,11 @@
                    /init.krun; default /tmp/libkrun/target/release/libkrun_init.so.0.1.0
     :cpus :memory-mib
     :mounts        [[tag host-path] ...] extra virtio-fs devices
-    :net-taps      [{:id :tap :mac}] virtio-net devices (TAP backend)"
-  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary dhcp]}]
+    :net-taps      [{:id :tap :mac}] virtio-net devices (TAP backend)
+    :display       {:width :height :sink (fn [frame])} attach a virtio-gpu
+                   device (see jolt.libkrun.display/gpu-device for the full
+                   opt map; :virgl-flags and :refresh-rate accepted too)"
+  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary dhcp display]}]
   (let [err (ffi/alloc 8)
         _ (init-log 2 4 0 0 err)  ; stderr, Debug — guest console logs here
         slot (ffi/alloc 8)
@@ -147,7 +151,8 @@
         _ (check-result! "krun_console_builder_add_default_console"
                           (console-builder-add-default console-builder 0 1 2 err))
         console-dev (ptr-or-throw! "krun_console_builder_build" (console-builder-build console-builder err))
-        _ (doseq [d (concat [root-dev] mount-devs net-devs [console-dev])] (device-manager-add mgr d))
+        gpu-dev (when display (display/gpu-device display))
+        _ (doseq [d (concat [root-dev] mount-devs net-devs (when display [gpu-dev]) [console-dev])] (device-manager-add mgr d))
         _ (vmm-builder-devices slot mgr)
         vmm (vmm-builder-build slot err)
         _ (when (ffi/null? vmm)
