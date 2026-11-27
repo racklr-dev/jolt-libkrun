@@ -38,6 +38,11 @@
     (ffi/write-field p kstr-layout :len (alength (.getBytes s "UTF-8")))
     p))
 
+(defn- kstr-none!
+  "A zeroed KrunStr: {data NULL, len 0} — how Option<&str> spells None."
+  []
+  (ffi/alloc 16))  ; ffi/alloc zeroes
+
 (defn- kbytes! [bs]
   (let [n (alength bs)
         p (ffi/alloc 16)
@@ -51,6 +56,7 @@
 (defkrun vmm-builder-vcpus      "krun_vmm_builder_vcpus"      [:pointer :uint8 :pointer] :uint64)
 (defkrun vmm-builder-ram-mib    "krun_vmm_builder_ram_mib"    [:pointer :uint32 :pointer] :uint64)
 (defkrun payload-load-krunfw    "krun_payload_load_krunfw"    [:pointer] :pointer)
+(defkrun payload-load-external  "krun_payload_load_external"  [:kstr :uint32 :kstr :kstr :pointer] :pointer)
 (defkrun vmm-builder-payload    "krun_vmm_builder_payload"    [:pointer :pointer] :void)
 (defkrun fs-device-new          "krun_fs_device_new"          [:kstr :kstr :pointer] :pointer)
 (defkrun net-device-tap         "krun_net_device_new_tap"     [:kstr :kstr :kbytes :uint32 :pointer] :pointer)
@@ -108,8 +114,8 @@
                    /.krun_config.json as OCI args)
     :env           [K=V ...] guest env
     :cwd           guest workdir (default /)
-    :init-binary   path to libkrun's init binary (libkrun_init.so), injected at
-                   /init.krun; default /tmp/libkrun/target/release/libkrun_init.so.0.1.0
+    :init-binary   path to libkrun's static guest init (krun-init), injected at
+                   /init.krun; default /tmp/libkrun/target/release/krun-init
     :cpus :memory-mib
     :mounts        [[tag host-path] ...] extra virtio-fs devices
     :net-taps      [{:id :tap :mac}] virtio-net devices (TAP backend)
@@ -117,9 +123,14 @@
                    device (see jolt.libkrun.display/gpu-device for the full
                    opt map; :virgl-flags and :refresh-rate accepted too)
     :keyboard      true — attach a virtio-input keyboard (see
-                   jolt.libkrun.input/keyboard-device; feed it send-key!)"
-  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary dhcp display keyboard?]}]
-  (let [err (ffi/alloc 8)
+                   jolt.libkrun.input/keyboard-device; feed it send-key!)
+    :mouse         {:width :height} — attach a virtio-input absolute
+                   touchscreen (the mouse) sized to the frame (see
+                   jolt.libkrun.input/touchscreen-device; feed it
+                   send-touch-event!). Requires :display (defaults 1280x720)."
+  [{:keys [rootfs cpus memory-mib mounts net-taps exec env cwd init-binary dhcp display keyboard? mouse]}]
+  (let [mouse-size (when mouse {:width (long (get mouse :width 1280))
+                                :height (long (get mouse :height 720))})err (ffi/alloc 8)
         _ (init-log 2 4 0 0 err)  ; stderr, Debug — guest console logs here
         slot (ffi/alloc 8)
         _ (ffi/write slot :pointer (vmm-builder-new))
@@ -156,7 +167,44 @@
         console-dev (ptr-or-throw! "krun_console_builder_build" (console-builder-build console-builder err))
         gpu-dev (when display (display/gpu-device display))
         keyboard-dev (when keyboard? (input/keyboard-device))
-        _ (doseq [d (concat [root-dev] mount-devs net-devs (when display [gpu-dev]) (when keyboard? [keyboard-dev]) [console-dev])] (device-manager-add mgr d))
+        mouse-dev (when mouse-size (input/touchscreen-device (:width mouse-size) (:height mouse-size)))
+        _ (doseq [d (concat [root-dev] mount-devs net-devs (when display [gpu-dev]) (when keyboard? [keyboard-dev]) (when mouse-dev [mouse-dev]) [console-dev])] (device-manager-add mgr d))
+        _ (vmm-builder-devices slot mgr)
+        vmm (vmm-builder-build slot err)
+        _ (when (ffi/null? vmm)
+            (let [eh (ffi/read err :pointer)]
+              (throw (ex-info "krun_vmm_builder_build failed"
+                              {:error-code (when-not (ffi/null? eh) (error-code eh))}))))]
+    (vmm-run vmm)))
+
+(defn boot-external!
+  "Boot a freestanding kernel (no Linux) via krun_payload_load_external.
+
+  opts:
+    :kernel      (required) path to the kernel image
+    :format      :elf (default) or :raw — KernelFormat enum
+    :initrd      optional path to an initrd/ramdisk loaded alongside the kernel
+    :cmdline     optional kernel cmdline string
+    :cpus :memory-mib"
+  [{:keys [kernel format initrd cmdline cpus memory-mib]}]
+  (let [err (ffi/alloc 8)
+        _ (init-log 2 4 0 0 err)  ; stderr, Debug — guest console logs here
+        slot (ffi/alloc 8)
+        _ (ffi/write slot :pointer (vmm-builder-new))
+        _ (check-result! "krun_vmm_builder_vcpus" (vmm-builder-vcpus slot (or cpus 2) err))
+        _ (check-result! "krun_vmm_builder_ram_mib" (vmm-builder-ram-mib slot (or memory-mib 512) err))
+        payload (ptr-or-throw! "krun_payload_load_external"
+                               (payload-load-external
+                                 (kstr! kernel)
+                                 (case (or format :elf) :elf 0 :raw 1)
+                                 (if initrd (kstr! initrd) (kstr-none!))
+                                 (kstr! (or cmdline ""))
+                                 err))
+        _ (vmm-builder-payload slot payload)
+        ;; legacy 16550 UART at 0x3F8 (ttyS0): guest COM1 -> host stdin/stdout
+        _ (check-result! "krun_vmm_builder_add_serial_console"
+                         (vmm-builder-serial-console slot 0 1 err))
+        mgr (mmio-device-manager-new)
         _ (vmm-builder-devices slot mgr)
         vmm (vmm-builder-build slot err)
         _ (when (ffi/null? vmm)
